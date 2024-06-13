@@ -82,18 +82,89 @@ func (s *searchService) SearchStoresByPincode(pincode string, term string) (any,
 	return stores, nil
 }
 
-func (s *searchService) SearchProductsByPincode(pincode string, term string) (any, error) {
+func (s *searchService) getStoreIdsByPincode(pincode string) (map[string]string, error) {
+	// Implement the logic to get store ids by pincode
 	content := strings.NewReader(`
 	{
-     "query":   {
-        "multi_match": {
-        "query":  "` + term + `",  
-          "fields": ["name", "description", "category", "brand"],
-          "fuzziness": "AUTO"
-        }
-        }
-
+				"query": {
+					"term": {
+						"pincode": ` + pincode + `
+					}
+				}
 	}`)
+	ctx := context.Background()
+	searchResp, err := s.client.Search(
+		ctx, &opensearchapi.SearchReq{
+			Body:    content,
+			Indices: []string{"stores-index"},
+		},
+	)
+
+	if err != nil {
+		fmt.Printf("Error searching: %v\n", err)
+		return map[string]string{}, err
+	}
+	fmt.Printf("Search hits: %v\n", searchResp.Hits.Total.Value)
+
+	// storeIds := make([]string, 0)
+	// storeNames := make([]string, 0)
+	storeIdToName := make(map[string]string)
+	if searchResp.Hits.Total.Value > 0 {
+		for _, hit := range searchResp.Hits.Hits {
+			store := make(map[string]interface{})
+			err := json.Unmarshal(hit.Source, &store)
+			if err != nil {
+				fmt.Printf("Error unmarshalling: %v\n", err)
+				return map[string]string{}, err
+			}
+			// storeIds = append(storeIds, store["id"].(string))
+			// storeNames = append(storeNames, store["name"].(string))
+			storeIdToName[store["id"].(string)] = store["name"].(string)
+		}
+
+	}
+
+	return storeIdToName, nil
+}
+
+func (s *searchService) SearchProductsByPincode(pincode string, term string) (any, error) {
+
+	storeIdToName, err := s.getStoreIdsByPincode(pincode)
+	if err != nil {
+		return err, nil
+	}
+
+	storeIds := make([]string, 0)
+	for storeId := range storeIdToName {
+		storeIds = append(storeIds, storeId)
+	}
+	// storeNames := make([]string, 0)
+
+	content := strings.NewReader(`{
+  "query": {
+    "bool": {
+       "filter": {
+   "terms": {
+    "store_id.keyword": [
+	  "` + strings.Join(storeIds, `","`) + `"
+        ]
+      
+    }
+        
+      },
+      "must": [
+        {
+        "multi_match": {
+        "query": "` + term + `",  
+          "fields": ["name", "description", "category", "brand"],
+        "fuzziness": "AUTO"
+        }
+        }
+       ]
+   
+    }
+  }
+}`)
 	ctx := context.Background()
 	searchResp, err := s.client.Search(
 		ctx, &opensearchapi.SearchReq{
@@ -115,11 +186,14 @@ func (s *searchService) SearchProductsByPincode(pincode string, term string) (an
 		for _, hit := range searchResp.Hits.Hits {
 
 			product := make(map[string]interface{})
+
 			err := json.Unmarshal(hit.Source, &product)
 			if err != nil {
 				fmt.Printf("Error unmarshalling: %v\n", err)
 				return err, nil
 			}
+			product["store_name"] = storeIdToName[product["store_id"].(string)]
+
 			products = append(products, product)
 		}
 
