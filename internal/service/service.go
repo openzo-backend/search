@@ -39,7 +39,7 @@ func (s *searchService) SearchStoresByPincode(pincode string, term string) (any,
       {
       "multi_match": {
       "query": "` + term + `",
-      "fields": ["name^3", "category^1", "sub_category^2", "description","address^5", "primary_cuisine", "secondary_cuisine"],
+      "fields": ["name^3", "category^1", "sub_category^2", "description","address^5", "primary_cuisine", "secondary_cuisine", "meta_description", "meta_tags"],
       "fuzziness": "AUTO"
     }
       }
