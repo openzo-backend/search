@@ -90,7 +90,9 @@ func (s *searchService) getStoreIdsByPincode(pincode string) (map[string]string,
 					"term": {
 						"pincode": ` + pincode + `
 					}
-				}
+				},
+				"size": 100,
+                "from": 0
 	}`)
 	ctx := context.Background()
 	searchResp, err := s.client.Search(
