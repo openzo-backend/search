@@ -35,17 +35,6 @@ func main() {
 		log.Fatal(fmt.Errorf("failed to load config: %w", err))
 	}
 
-	// searchRepository := repository.NewLocalNotificationRepository(db)
-	// searchService := service.NewLocalNotificationService(searchRepository)
-
-	// client, err := opensearchapi.NewClient(opensearch.Config{
-	// 	Transport: &http.Transport{
-	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	// 	},
-	// 	Addresses: []string{cfg.OpenSearchURL},
-	// 	Username:  cfg.OpenSearchUsername, // For testing only. Don't store credentials in code.
-	// 	Password:  cfg.OpenSearchPassword,
-	// })
 	client, err := opensearchapi.NewClient(
 		opensearchapi.Config{
 			Client: opensearch.Config{
@@ -62,38 +51,12 @@ func main() {
 		log.Fatalf("Error creating the client: %s", err)
 	}
 
-	// settings := strings.NewReader(`{
-	// "settings": {
-	//         "index": {
-	//             "number_of_shards": 1
-	//         }
-	//     }
-	// 	}`)
-	// ctx := context.Background()
-	// _, err = client.Indices.Create(ctx, opensearchapi.IndicesCreateReq{
-	// 	Index: "go-test-index1",
-	// 	Body:  settings,
-	// })
-
-	// if err != nil {
-	// 	log.Fatalf("Error creating index: %v", err)
-	// }
-
 	searchService := service.NewSearchService(client)
-	searchService.SearchStoresByPincode("123456", "Think bigg")
+	// searchService.SearchStoresByPincode("123456", "Think bigg")
 	handlers := handlers.NewSearchHandler(searchService)
 
 	go consumeKafkaTopicStores(client)
 	go consumeKafkaTopicProducts(client)
-
-	//Initialize gRPC client
-	// conn, err := grpc.Dial(cfg.UserGrpc, grpc.WithInsecure())
-	// if err != nil {
-	// 	log.Fatalf("did not connect: %v", err)
-	// }
-	// defer conn.Close()
-	// c := pb.NewUserServiceClient(conn)
-	// UserClient = c
 
 	// Initialize HTTP server with Gin
 	router := gin.Default()
@@ -137,7 +100,7 @@ func consumeKafkaTopicStores(client *opensearchapi.Client) {
 
 		err = consumer.SubscribeTopics([]string{topic}, nil)
 		if err != nil {
-			log.Printf("Error subscribing to topic: %v. Retrying in 5 seconds...", err)
+			log.Printf("Error subscribing  to new  topic: %v. Retrying in 5 seconds...", err)
 			consumer.Close()
 			time.Sleep(5 * time.Second)
 			continue
@@ -205,9 +168,10 @@ func consumeKafkaTopicProducts(client *opensearchapi.Client) {
 					DocumentID: string(ev.Key),
 					Body:       strings.NewReader(string(ev.Value)),
 				})
-
+				print("hello")
 				if err != nil {
-					log.Fatalf("Error indexing document: %v", err)
+
+					log.Printf("Error indexing document: %v", err)
 				}
 				log.Printf("Message on %s: %s\n", ev.TopicPartition, string(ev.Value))
 
@@ -217,8 +181,8 @@ func consumeKafkaTopicProducts(client *opensearchapi.Client) {
 			}
 		}
 
-		log.Println("Consumer disconnected. Reconnecting in 5 seconds...")
+		log.Println("Consumer disconnected. Reconnecting in 1 second...")
 		consumer.Close()
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
